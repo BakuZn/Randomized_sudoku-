@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sudoku Game</title>
+    <style>
+        :root {
+            --primary: #f1c40f; /* Yellow */
+            --secondary: #2c3e50; /* Navy */
+            --background: #2d2d2d; /* Dark Grey */
+            --light: #4a4a4a; /* Lighter Grey */
+            --text: #e0e0e0; /* Off-white text */
+        }
+
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, var(--background) 0%, #3a3a3a 100%);
+            transition: all 0.5s ease;
+            color: var(--text);
+        }
+
+        .start-menu {
+            text-align: center;
+            background: var(--light);
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+            transform: scale(0);
+            animation: popIn 0.5s ease forwards;
+        }
+
+        .game-container {
+            display: none;
+            text-align: center;
+            opacity: 0;
+            transform: translateY(20px);
+            position: relative;
+        }
+
+        .game-container.active {
+            opacity: 1;
+            transform: translateY(0);
+            transition: all 0.6s ease;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(9, 50px);
+            gap: 4px;
+            background: var(--secondary);
+            padding: 4px;
+            margin: 30px auto;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .cell {
+            width: 50px;
+            height: 50px;
+            background: var(--light);
+            border: none;
+            border-radius: 5px;
+            text-align: center;
+            font-size: 18px;
+            color: var(--text);
+            transition: all 0.3s ease;
+        }
+
+        .cell:hover {
+            transform: scale(1.05);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+
+        .cell:read-only {
+            background: var(--primary);
+            color: var(--secondary);
+            cursor: not-allowed;
+        }
+
+        .popup {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            background: var(--light);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+            max-width: 400px;
+        }
+
+        .popup.active {
+            display: block;
+            animation: popIn 0.5s ease forwards;
+        }
+
+        button {
+            padding: 12px 25px;
+            margin: 10px;
+            border: none;
+            border-radius: 25px;
+            background: var(--secondary);
+            color: var(--text);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        button:hover {
+            background: var(--primary);
+            color: var(--secondary);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        h1, h2 {
+            margin: 0 0 20px;
+            font-weight: 600;
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0); }
+            80% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .footer {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            font-size: 12px;
+            color: var(--text);
+            opacity: 0.7;
+        }
+
+        .solution-grid {
+            display: none;
+            grid-template-columns: repeat(9, 50px);
+            gap: 4px;
+            background: var(--secondary);
+            padding: 4px;
+            margin: 20px auto;
+            border-radius: 10px;
+        }
+
+        .solution-cell {
+            width: 50px;
+            height: 50px;
+            background: var(--light);
+            border-radius: 5px;
+            text-align: center;
+            font-size: 18px;
+            line-height: 50px;
+            color: var(--text);
+        }
+    </style>
+</head>
+<body>
+    <div class="start-menu" id="startMenu">
+        <h1>Sudoku Challenge</h1>
+        <button onclick="startGame()">Start Game</button>
+        <button onclick="showInstructions()">Instructions</button>
+    </div>
+
+    <div class="popup" id="instructions">
+        <h2>How to Play</h2>
+        <p>Fill the 9×9 grid with numbers 1-9.<br>
+           Each row, column, and 3×3 box must contain unique numbers.<br>
+           You have 5 chances to make mistakes.<br>
+           Pre-filled numbers are locked.<br>
+           Solve the puzzle before chances run out!</p>
+        <button onclick="hideInstructions()">Close</button>
+    </div>
+
+    <div class="game-container" id="gameContainer">
+        <h2>Chances Left: <span id="chances">5</span></h2>
+        <div class="grid" id="grid"></div>
+        <div class="solution-grid" id="solutionGrid"></div>
+        <button onclick="checkSolution()">Check Solution</button>
+        <button onclick="resetGame()">New Game</button>
+    </div>
+
+    <div class="footer">Made by Daksh Joshi</div>
+
+    <script>
+        let chances = 5;
+        let board, solution;
+
+        function generateSudoku() {
+            const base = [
+                [5,3,4,6,7,8,9,1,2],
+                [6,7,2,1,9,5,3,4,8],
+                [1,9,8,3,4,2,5,6,7],
+                [8,5,9,7,6,1,4,2,3],
+                [4,2,6,8,5,3,7,9,1],
+                [7,1,3,9,2,4,8,5,6],
+                [9,6,1,5,3,7,2,8,4],
+                [2,8,7,4,1,9,6,3,5],
+                [3,4,5,2,8,6,1,7,9]
+            ];
+            
+            shuffleBoard(base);
+            solution = JSON.parse(JSON.stringify(base));
+            board = JSON.parse(JSON.stringify(base));
+            
+            let cellsToRemove = 45;
+            while (cellsToRemove > 0) {
+                let i = Math.floor(Math.random() * 9);
+                let j = Math.floor(Math.random() * 9);
+                if (board[i][j] !== 0) {
+                    board[i][j] = 0;
+                    cellsToRemove--;
+                }
+            }
+        }
+
+        function shuffleBoard(board) {
+            for (let i = 0; i < 9; i++) {
+                let j = Math.floor(Math.random() * 9);
+                [board[i], board[j]] = [board[j], board[i]];
+            }
+            for (let i = 0; i < 9; i++) {
+                for (let j = 0; j < 9; j++) {
+                    let k = Math.floor(Math.random() * 9);
+                    [board[j][i], board[k][i]] = [board[k][i], board[j][i]];
+                }
+            }
+        }
+
+        function startGame() {
+            document.getElementById('startMenu').style.display = 'none';
+            const gameContainer = document.getElementById('gameContainer');
+            gameContainer.style.display = 'block';
+            setTimeout(() => gameContainer.classList.add('active'), 10);
+            generateSudoku();
+            createGrid();
+            document.getElementById('solutionGrid').style.display = 'none';
+        }
+
+        function createGrid() {
+            const grid = document.getElementById('grid');
+            grid.innerHTML = '';
+            for (let i = 0; i < 9; i++) {
+                for (let j = 0; j < 9; j++) {
+                    const input = document.createElement('input');
+                    input.className = 'cell';
+                    input.type = 'number';
+                    input.min = 1;
+                    input.max = 9;
+                    if (board[i][j] !== 0) {
+                        input.value = board[i][j];
+                        input.readOnly = true;
+                    }
+                    grid.appendChild(input);
+                }
+            }
+        }
+
+        function showSolution() {
+            const solutionGrid = document.getElementById('solutionGrid');
+            solutionGrid.innerHTML = '';
+            solutionGrid.style.display = 'grid';
+            for (let i = 0; i < 9; i++) {
+                for (let j = 0; j < 9; j++) {
+                    const div = document.createElement('div');
+                    div.className = 'solution-cell';
+                    div.textContent = solution[i][j];
+                    solutionGrid.appendChild(div);
+                }
+            }
+        }
+
+        function getPlayerBoard() {
+            const cells = document.getElementsByClassName('cell');
+            let playerBoard = [];
+            let k = 0;
+            for (let i = 0; i < 9; i++) {
+                let row = [];
+                for (let j = 0; j < 9; j++) {
+                    let val = cells[k].value ? parseInt(cells[k].value) : 0;
+                    row.push(val);
+                    k++;
+                }
+                playerBoard.push(row);
+            }
+            return playerBoard;
+        }
+
+        function checkSolution() {
+            const playerBoard = getPlayerBoard();
+            let correct = true;
+            
+            for (let i = 0; i < 9; i++) {
+                for (let j = 0; j < 9; j++) {
+                    if (playerBoard[i][j] !== solution[i][j]) {
+                        correct = false;
+                        break;
+                    }
+                }
+                if (!correct) break;
+            }
+
+            if (correct) {
+                alert('Congratulations! You solved the Sudoku!');
+                resetGame();
+            } else {
+                chances--;
+                document.getElementById('chances').textContent = chances;
+                if (chances > 0) {
+                    alert(`Incorrect! ${chances} chances remaining.`);
+                } else {
+                    alert('Game Over! No chances left. Here\'s the solution:');
+                    showSolution();
+                }
+            }
+        }
+
+        function resetGame() {
+            chances = 5;
+            document.getElementById('chances').textContent = chances;
+            generateSudoku();
+            createGrid();
+            document.getElementById('solutionGrid').style.display = 'none';
+        }
+
+        function showInstructions() {
+            document.getElementById('instructions').classList.add('active');
+        }
+
+        function hideInstructions() {
+            document.getElementById('instructions').classList.remove('active');
+        }
+    </script>
+</body>
+</html>
